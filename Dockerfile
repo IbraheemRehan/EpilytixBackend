@@ -10,17 +10,18 @@ COPY package*.json ./
 # Install app dependencies
 ENV npm_config_engine_strict=false
 RUN npm install
+RUN chmod +x ./node_modules/.bin/nest
 
 # Bundle app source
 COPY . .
 
 # Build the app
-RUN npx nest build
+RUN nest build
 
 # ---
 
 # Production image
-FROM node:20-alpine AS production
+FROM node:22-alpine AS production
 
 WORKDIR /usr/src/app
 
