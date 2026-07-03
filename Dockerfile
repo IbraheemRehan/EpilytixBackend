@@ -1,5 +1,5 @@
 # Base image
-FROM node:20-alpine AS builder
+FROM node:22-alpine AS builder
 
 # Create app directory
 WORKDIR /usr/src/app
@@ -8,7 +8,8 @@ WORKDIR /usr/src/app
 COPY package*.json ./
 
 # Install app dependencies
-RUN npm ci
+ENV npm_config_engine_strict=false
+RUN npm install
 
 # Bundle app source
 COPY . .
