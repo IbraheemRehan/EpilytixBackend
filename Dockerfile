@@ -11,13 +11,14 @@ COPY package*.json ./
 # Install app dependencies
 ENV npm_config_engine_strict=false
 RUN npm install
+RUN chmod +x ./node_modules/.bin/nest
 
 
 # Bundle app source
 COPY . .
 
 # Build the app
-RUN npx nest build
+RUN npm run build
 
 # ---
 
