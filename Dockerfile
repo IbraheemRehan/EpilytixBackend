@@ -3,6 +3,7 @@ FROM node:22-alpine AS builder
 
 # Create app directory
 WORKDIR /usr/src/app
+ENV PATH=/usr/src/app/node_modules/.bin:$PATH
 
 # A wildcard is used to ensure both package.json AND package-lock.json are copied
 COPY package*.json ./
@@ -10,13 +11,13 @@ COPY package*.json ./
 # Install app dependencies
 ENV npm_config_engine_strict=false
 RUN npm install
-RUN chmod +x ./node_modules/.bin/nest
+
 
 # Bundle app source
 COPY . .
 
 # Build the app
-RUN nest build
+RUN npx nest build
 
 # ---
 
