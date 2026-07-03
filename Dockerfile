@@ -15,7 +15,7 @@ RUN npm install
 COPY . .
 
 # Build the app
-RUN npm run build
+RUN npx nest build
 
 # ---
 
