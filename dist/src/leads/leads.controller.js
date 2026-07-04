@@ -11,6 +11,7 @@ var __metadata = (this && this.__metadata) || function (k, v) {
 var __param = (this && this.__param) || function (paramIndex, decorator) {
     return function (target, key) { decorator(target, key, paramIndex); }
 };
+var LeadsController_1;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.LeadsController = void 0;
 const common_1 = require("@nestjs/common");
@@ -22,12 +23,14 @@ const add_note_dto_1 = require("./dto/add-note.dto");
 const jwt_auth_guard_1 = require("../common/guards/jwt-auth.guard");
 const public_decorator_1 = require("../common/decorators/public.decorator");
 const current_user_decorator_1 = require("../common/decorators/current-user.decorator");
-let LeadsController = class LeadsController {
+let LeadsController = LeadsController_1 = class LeadsController {
     leadsService;
+    logger = new common_1.Logger(LeadsController_1.name);
     constructor(leadsService) {
         this.leadsService = leadsService;
     }
     create(createLeadDto) {
+        this.logger.log(`🚀 POST /leads received from: ${createLeadDto.email}`);
         return this.leadsService.create(createLeadDto);
     }
     async export(res, user) {
@@ -162,7 +165,7 @@ __decorate([
     __metadata("design:paramtypes", [String, Object]),
     __metadata("design:returntype", void 0)
 ], LeadsController.prototype, "delete", null);
-exports.LeadsController = LeadsController = __decorate([
+exports.LeadsController = LeadsController = LeadsController_1 = __decorate([
     (0, common_1.Controller)('leads'),
     __metadata("design:paramtypes", [leads_service_1.LeadsService])
 ], LeadsController);

@@ -18,6 +18,7 @@ export declare class LeadsService {
     private notificationsService;
     private newsletterService;
     private configService;
+    private readonly logger;
     private resend;
     constructor(leadModel: Model<LeadDocument>, deletionRequestModel: Model<LeadDeletionRequestDocument>, userModel: Model<UserDocument>, auditLogService: AuditLogService, notificationsService: NotificationsService, newsletterService: NewsletterService, configService: ConfigService);
     create(createLeadDto: CreateLeadDto, user?: any): Promise<Lead & import("mongoose").Document<Types.ObjectId, any, any, Record<string, any>, {}> & Required<{

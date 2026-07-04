@@ -6,6 +6,7 @@ import { AddNoteDto } from './dto/add-note.dto';
 import type { Response } from 'express';
 export declare class LeadsController {
     private readonly leadsService;
+    private readonly logger;
     constructor(leadsService: LeadsService);
     create(createLeadDto: CreateLeadDto): Promise<import("./schemas/lead.schema").Lead & import("mongoose").Document<import("mongoose").Types.ObjectId, any, any, Record<string, any>, {}> & Required<{
         _id: import("mongoose").Types.ObjectId;

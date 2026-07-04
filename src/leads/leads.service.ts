@@ -163,7 +163,7 @@ export class LeadsService {
       this.logger.log(`📧 Sending company notification email to: ${companyEmail}`);
       try {
         const result = await this.resend.emails.send({
-          from: 'Epilytix Consultations <onboarding@resend.dev>',
+          from: 'Epilytix Consultations <noreply@epilytix.com>',
           to: companyEmail,
           subject: `[New Lead] Consultation Request from ${lead.name}`,
           html: `
@@ -202,7 +202,7 @@ export class LeadsService {
       this.logger.log(`📧 Sending confirmation email to lead: ${lead.email}`);
       try {
         const confirmResult = await this.resend.emails.send({
-          from: 'Epilytix Consultations <onboarding@resend.dev>',
+          from: 'Epilytix Consultations <noreply@epilytix.com>',
           to: lead.email,
           subject: 'Your consultation request has been received',
           html: `
