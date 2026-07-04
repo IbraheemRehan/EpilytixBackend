@@ -11,8 +11,7 @@ COPY package*.json ./
 # Install app dependencies
 ENV npm_config_engine_strict=false
 RUN npm install
-RUN chmod +x ./node_modules/.bin/nest
-
+RUN chmod -R 755 ./node_modules/.bin
 
 # Bundle app source
 COPY . .
