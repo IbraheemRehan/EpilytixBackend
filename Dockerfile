@@ -1,38 +1,25 @@
-# Base image
+# ---------- Builder -------------------------------------------------
 FROM node:22-alpine AS builder
 
-# Create app directory
+# Work dir & make the local bin searchable
 WORKDIR /usr/src/app
 ENV PATH=/usr/src/app/node_modules/.bin:$PATH
 
-# A wildcard is used to ensure both package.json AND package-lock.json are copied
+# Install exact deps (deterministic)
 COPY package*.json ./
-
-# Install app dependencies
 ENV npm_config_engine_strict=false
-RUN npm install && npm install -g @nestjs/cli
+RUN npm ci                     # no global Nest install – we use the local CLI
 
-
-# Bundle app source
+# Copy source & compile
 COPY . .
+RUN npm run build             # runs `nest build` → creates ./dist
 
-# Build the app
-RUN nest build
-
-# ---
-
-# Production image
+# ---------- Production -----------------------------------------------
 FROM node:22-alpine AS production
-
 WORKDIR /usr/src/app
 
-# Copy the bundled code from the build stage
-COPY --from=builder /usr/src/app/node_modules ./node_modules
-COPY --from=builder /usr/src/app/dist ./dist
-COPY --from=builder /usr/src/app/package*.json ./
+# **Copy the *entire* build output** (including dist, node_modules, etc.)
+COPY --from=builder /usr/src/app . 
 
-# Set environment variables
 ENV NODE_ENV=production
-
-# Start the server using the production build
-CMD [ "node", "dist/main.js" ]
+CMD ["node", "dist/main.js"]
