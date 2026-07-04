@@ -86,9 +86,16 @@ async function bootstrap() {
   app.use(compression());
   app.use(cookieParser());
   
-  // CORS — allow all origins in development for mobile app access
+  // Secure CORS — allow configured origins, allow mobile apps (no origin header), and allow all in development
+  const corsOrigins = configService.get<string[]>('app.corsOrigins') || [];
   app.enableCors({
-    origin: true,
+    origin: (origin, callback) => {
+      if (!origin || corsOrigins.includes(origin) || configService.get<string>('app.nodeEnv') === 'development') {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
     credentials: true,
   });
 
