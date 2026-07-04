@@ -157,9 +157,9 @@ export class LeadsService {
       )
       .join('\n');
 
-    // Send detailed consultation request email to the Epilytix company email
+    // Send detailed consultation request email to the company inbox
     if (this.resend) {
-      const companyEmail = this.configService.get<string>('app.ceo.email') || 'epilytix.official@gmail.com';
+      const companyEmail = this.configService.get<string>('app.company.email') || 'epilytix.official@gmail.com';
       this.logger.log(`📧 Sending company notification email to: ${companyEmail}`);
       try {
         const result = await this.resend.emails.send({
@@ -198,20 +198,107 @@ export class LeadsService {
         this.logger.error('❌ Failed to send company notification email', error?.message || error);
       }
 
-      // Send confirmation email to the lead (customer)
+      // Send confirmation email to the lead (customer) — branded template
       this.logger.log(`📧 Sending confirmation email to lead: ${lead.email}`);
       try {
+        const firstName = lead.name?.split(' ')[0] || 'there';
+        const currentYear = new Date().getFullYear();
+
         const confirmResult = await this.resend.emails.send({
           from: 'Epilytix Consultations <noreply@epilytix.com>',
           to: lead.email,
           subject: 'Your consultation request has been received',
           html: `
-            <div style="font-family: 'Inter', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 25px; background-color: #030303; border: 1px solid #1a1a1f; border-radius: 12px; color: #ffffff;">
-              <h2 style="color: #fa0395;">Thank you for reaching out</h2>
-              <p>Hi ${lead.name},</p>
-              <p>We have received your consultation request for <strong>${service}</strong>. Our team will get back to you shortly.</p>
-              <p>Best regards,<br/>Epilytix Team</p>
-            </div>`
+            <!DOCTYPE html>
+            <html>
+            <head>
+              <meta charset="utf-8" />
+              <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+              <title>Consultation Received</title>
+              <style>
+                body { margin: 0; padding: 0; background-color: #030303; }
+                @media only screen and (max-width: 620px) {
+                  .email-container { width: 100% !important; }
+                  .responsive-image { height: auto !important; }
+                }
+              </style>
+            </head>
+            <body style="margin: 0; padding: 0; background-color: #030303;">
+              <table border="0" cellpadding="0" cellspacing="0" width="100%">
+                <tr>
+                  <td align="center" style="padding: 30px 15px;">
+                    <table class="email-container" border="0" cellpadding="0" cellspacing="0" width="600" style="max-width: 600px; background-color: #030303; border: 1px solid #1a1a1f; border-radius: 12px; overflow: hidden; font-family: 'Inter', Arial, sans-serif;">
+
+                      <!-- Header -->
+                      <tr>
+                        <td align="center" style="background: linear-gradient(135deg, #fa0395 0%, #a3009c 100%); padding: 40px 25px;">
+                          <h1 style="margin: 0; color: #ffffff; font-size: 32px; font-weight: 900; letter-spacing: 2px;">EPILYTIX</h1>
+                          <p style="margin: 8px 0 0 0; color: #ffffff; font-size: 12px; font-weight: 700; letter-spacing: 2px; text-transform: uppercase; opacity: 0.9;">Where Chaos Becomes Clarity</p>
+                        </td>
+                      </tr>
+
+                      <!-- Body -->
+                      <tr>
+                        <td style="padding: 35px 30px;">
+                          <p style="margin: 0 0 20px 0; color: #ffffff; font-size: 16px; font-weight: 700;">Hi ${firstName},</p>
+                          <p style="margin: 0 0 25px 0; color: #b0b0bc; font-size: 14px; line-height: 1.7; font-weight: 300;">
+                            We have successfully received your consultation request and appreciate your interest in Epilytix. Our team is currently reviewing the information you provided. A member of our team will contact you within 24&ndash;48 hours to discuss your requirements and schedule a consultation at a convenient time.
+                          </p>
+
+                          <!-- Inquiry Box -->
+                          <table border="0" cellpadding="0" cellspacing="0" width="100%" style="background-color: #0c0c10; border-radius: 8px; margin-bottom: 25px;">
+                            <tr>
+                              <td style="border-left: 3px solid #fa0395; padding: 20px;">
+                                <p style="margin: 0 0 12px 0; color: #fa0395; font-size: 12px; font-weight: 900; letter-spacing: 1px; text-transform: uppercase;">Your Inquiry</p>
+                                <p style="margin: 0 0 8px 0; color: #b0b0bc; font-size: 14px;"><strong style="color: #ffffff;">Service:</strong> ${service}</p>
+                                <p style="margin: 0; color: #b0b0bc; font-size: 14px; line-height: 1.6;"><strong style="color: #ffffff;">Request:</strong> ${requestMessage}</p>
+                              </td>
+                            </tr>
+                          </table>
+
+                          <p style="margin: 0 0 20px 0; color: #b0b0bc; font-size: 14px; line-height: 1.7; font-weight: 300;">
+                            During the consultation, we will discuss your goals and requirements, answer any questions you may have, and explore potential solutions tailored to your needs.
+                          </p>
+                          <p style="margin: 0; color: #b0b0bc; font-size: 14px; line-height: 1.7; font-weight: 300;">
+                            If your inquiry is urgent, please reply to this email and we will do our best to assist you promptly.
+                          </p>
+                        </td>
+                      </tr>
+
+                      <!-- Engineering Journal -->
+                      <tr>
+                        <td style="padding: 0 30px 10px 30px;">
+                          <hr style="border: none; border-top: 1px solid #1a1a1f; margin: 0 0 30px 0;" />
+                          <h2 style="margin: 0 0 6px 0; color: #ffffff; font-size: 20px; font-weight: 900; letter-spacing: 0.5px; text-transform: uppercase;">Engineering Journal</h2>
+                          <p style="margin: 0 0 25px 0; color: #6e6e7d; font-size: 13px; font-weight: 300;">Explore our latest architectural updates and technical reviews</p>
+
+                          ${blogsHtml}
+                        </td>
+                      </tr>
+
+                      <!-- Footer -->
+                      <tr>
+                        <td style="padding: 20px 30px 35px 30px;">
+                          <hr style="border: none; border-top: 1px solid #1a1a1f; margin: 0 0 25px 0;" />
+                          <p style="margin: 0 0 15px 0; color: #eaeaea; font-size: 14px; text-align: center;">Thank you for choosing Epilytix. We look forward to speaking with you.</p>
+                          <p style="margin: 0; color: #ffffff; font-size: 14px; font-weight: 700; text-align: center;">Best regards,<br/>The Epilytix Team</p>
+                        </td>
+                      </tr>
+
+                      <tr>
+                        <td style="padding: 20px 30px; border-top: 1px solid #1a1a1f; text-align: center;">
+                          <p style="margin: 0 0 4px 0; color: #6e6e7d; font-size: 11px;">&copy; ${currentYear} Epilytix. All rights reserved.</p>
+                          <p style="margin: 0; color: #6e6e7d; font-size: 11px;">You are receiving this because you requested a consultation on our website.</p>
+                        </td>
+                      </tr>
+
+                    </table>
+                  </td>
+                </tr>
+              </table>
+            </body>
+            </html>
+          `,
         });
         if (confirmResult.error) {
           this.logger.error(`❌ Resend API error for lead email: ${JSON.stringify(confirmResult.error)}`);
