@@ -189,7 +189,11 @@ export class LeadsService {
             </div>
           `,
         });
-        this.logger.log(`✅ Company email sent successfully. Resend ID: ${result?.data?.id}`);
+        if (result.error) {
+          this.logger.error(`❌ Resend API error for company email: ${JSON.stringify(result.error)}`);
+        } else {
+          this.logger.log(`✅ Company email sent successfully. Resend ID: ${result.data?.id}`);
+        }
       } catch (error) {
         this.logger.error('❌ Failed to send company notification email', error?.message || error);
       }
@@ -209,7 +213,11 @@ export class LeadsService {
               <p>Best regards,<br/>Epilytix Team</p>
             </div>`
         });
-        this.logger.log(`✅ Confirmation email sent. Resend ID: ${confirmResult?.data?.id}`);
+        if (confirmResult.error) {
+          this.logger.error(`❌ Resend API error for lead email: ${JSON.stringify(confirmResult.error)}`);
+        } else {
+          this.logger.log(`✅ Confirmation email sent. Resend ID: ${confirmResult.data?.id}`);
+        }
       } catch (err) {
         this.logger.error('❌ Failed to send confirmation email to lead', err?.message || err);
       }
