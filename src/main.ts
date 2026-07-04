@@ -20,11 +20,21 @@ export class RedisIoAdapter extends IoAdapter {
   private adapterConstructor: ReturnType<typeof createAdapter>;
 
   async connectToRedis(configService: ConfigService): Promise<void> {
-    const host = configService.get<string>('redis.host');
-    const port = configService.get<number>('redis.port');
-    const password = configService.get<string>('redis.password');
+    const upstashUrl = configService.get<string>('redis.url');
+    const upstashToken = configService.get<string>('redis.token');
+    let pubClient: Redis;
+    if (upstashUrl) {
+      // Upstash provides a HTTPS endpoint; ioredis can connect via TLS on port 443
+      pubClient = new Redis(upstashUrl, { password: upstashToken, tls: {} , maxRetriesPerRequest: null});
+      console.log('✅ Using Upstash Redis (REST URL)');
+    } else {
+      const host = configService.get<string>('redis.host');
+      const port = configService.get<number>('redis.port');
+      const password = configService.get<string>('redis.password');
+      pubClient = new Redis({ host, port, password, maxRetriesPerRequest: null });
+      console.log('✅ Using Standard Redis');
+    }
 
-    const pubClient = new Redis({ host, port, password, maxRetriesPerRequest: null });
     pubClient.on('error', (err) => {
       console.error('Redis PubClient error:', err);
     });
