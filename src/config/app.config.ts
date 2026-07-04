@@ -38,6 +38,9 @@ export default registerAs('app', () => ({
     firstName: process.env.CEO_FIRST_NAME || 'Ibraheem',
     lastName: process.env.CEO_LAST_NAME || 'Rehan',
   },
+  company: {
+    email: process.env.COMPANY_EMAIL || 'epilytix.official@gmail.com',
+  },
   twoFactor: {
     appName: process.env.TWO_FACTOR_APP_NAME || 'Epilytix',
     otpExpirySeconds: parseInt(process.env.OTP_EXPIRY_SECONDS || '300', 10),
