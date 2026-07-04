@@ -178,6 +178,25 @@ let LeadsService = class LeadsService {
             catch (error) {
                 console.error('Failed to send consultation notification email to company', error);
             }
+            if (this.resend) {
+                try {
+                    await this.resend.emails.send({
+                        from: 'Epilytix Consultations <onboarding@resend.dev>',
+                        to: lead.email,
+                        subject: 'Your consultation request has been received',
+                        html: `
+              <div style="font-family: 'Inter', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 25px; background-color: #030303; border: 1px solid #1a1a1f; border-radius: 12px; color: #ffffff;">
+                <h2 style="color: #fa0395;">Thank you for reaching out</h2>
+                <p>Hi ${lead.name},</p>
+                <p>We have received your consultation request for <strong>${service}</strong>. Our team will get back to you shortly.</p>
+                <p>Best regards,<br/>Epilytix Team</p>
+              </div>`
+                    });
+                }
+                catch (err) {
+                    console.error('Failed to send confirmation email to lead', err);
+                }
+            }
         }
         try {
             const activeFounders = await this.userModel.find({
