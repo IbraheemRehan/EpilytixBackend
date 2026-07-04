@@ -9,6 +9,7 @@ import {
   UseGuards,
   Delete,
   Res,
+  Logger,
 } from '@nestjs/common';
 import { LeadsService } from './leads.service';
 import { CreateLeadDto } from './dto/create-lead.dto';
@@ -22,11 +23,13 @@ import type { Response } from 'express';
 
 @Controller('leads')
 export class LeadsController {
+  private readonly logger = new Logger(LeadsController.name);
   constructor(private readonly leadsService: LeadsService) {}
 
   @Public() // Public endpoint for web forms to submit leads
   @Post()
   create(@Body() createLeadDto: CreateLeadDto) {
+    this.logger.log(`🚀 POST /leads received from: ${createLeadDto.email}`);
     return this.leadsService.create(createLeadDto);
   }
 

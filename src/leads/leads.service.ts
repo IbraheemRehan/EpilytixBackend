@@ -3,6 +3,7 @@ import {
   NotFoundException,
   ForbiddenException,
   ConflictException,
+  Logger,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
@@ -22,6 +23,7 @@ import { Resend } from 'resend';
 
 @Injectable()
 export class LeadsService {
+  private readonly logger = new Logger(LeadsService.name);
   private resend: Resend;
 
   constructor(
@@ -33,9 +35,12 @@ export class LeadsService {
     private newsletterService: NewsletterService,
     private configService: ConfigService,
   ) {
-    const resendApiKey = this.configService.get('app.resend.apiKey');
+    const resendApiKey = this.configService.get<string>('app.resend.apiKey');
     if (resendApiKey) {
       this.resend = new Resend(resendApiKey);
+      this.logger.log('✅ Resend initialized successfully');
+    } else {
+      this.logger.warn('⚠️ RESEND_API_KEY not configured — emails will NOT be sent');
     }
   }
 
@@ -150,11 +155,14 @@ export class LeadsService {
               </table>
         `,
       )
-      .join('\n');    // Send detailed consultation request email to the Epilytix company email
+      .join('\n');
+
+    // Send detailed consultation request email to the Epilytix company email
     if (this.resend) {
+      const companyEmail = this.configService.get<string>('app.ceo.email') || 'epilytix.official@gmail.com';
+      this.logger.log(`📧 Sending company notification email to: ${companyEmail}`);
       try {
-        const companyEmail = this.configService.get('app.ceo.email') || 'epilytix.official@gmail.com';
-        await this.resend.emails.send({
+        const result = await this.resend.emails.send({
           from: 'Epilytix Consultations <onboarding@resend.dev>',
           to: companyEmail,
           subject: `[New Lead] Consultation Request from ${lead.name}`,
@@ -181,29 +189,32 @@ export class LeadsService {
             </div>
           `,
         });
+        this.logger.log(`✅ Company email sent successfully. Resend ID: ${result?.data?.id}`);
       } catch (error) {
-        console.error('Failed to send consultation notification email to company', error);
+        this.logger.error('❌ Failed to send company notification email', error?.message || error);
       }
 
       // Send confirmation email to the lead (customer)
-      if (this.resend) {
-        try {
-          await this.resend.emails.send({
-            from: 'Epilytix Consultations <onboarding@resend.dev>',
-            to: lead.email,
-            subject: 'Your consultation request has been received',
-            html: `
-              <div style="font-family: 'Inter', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 25px; background-color: #030303; border: 1px solid #1a1a1f; border-radius: 12px; color: #ffffff;">
-                <h2 style="color: #fa0395;">Thank you for reaching out</h2>
-                <p>Hi ${lead.name},</p>
-                <p>We have received your consultation request for <strong>${service}</strong>. Our team will get back to you shortly.</p>
-                <p>Best regards,<br/>Epilytix Team</p>
-              </div>`
-          });
-        } catch (err) {
-          console.error('Failed to send confirmation email to lead', err);
-        }
+      this.logger.log(`📧 Sending confirmation email to lead: ${lead.email}`);
+      try {
+        const confirmResult = await this.resend.emails.send({
+          from: 'Epilytix Consultations <onboarding@resend.dev>',
+          to: lead.email,
+          subject: 'Your consultation request has been received',
+          html: `
+            <div style="font-family: 'Inter', Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 25px; background-color: #030303; border: 1px solid #1a1a1f; border-radius: 12px; color: #ffffff;">
+              <h2 style="color: #fa0395;">Thank you for reaching out</h2>
+              <p>Hi ${lead.name},</p>
+              <p>We have received your consultation request for <strong>${service}</strong>. Our team will get back to you shortly.</p>
+              <p>Best regards,<br/>Epilytix Team</p>
+            </div>`
+        });
+        this.logger.log(`✅ Confirmation email sent. Resend ID: ${confirmResult?.data?.id}`);
+      } catch (err) {
+        this.logger.error('❌ Failed to send confirmation email to lead', err?.message || err);
       }
+    } else {
+      this.logger.warn('⚠️ Resend not initialized — skipping all emails for this lead');
     }
 
     // Notify all active founders/CEOs via in-app notification only
