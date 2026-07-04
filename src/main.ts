@@ -23,16 +23,26 @@ export class RedisIoAdapter extends IoAdapter {
     const upstashUrl = configService.get<string>('redis.url');
     const upstashToken = configService.get<string>('redis.token');
     let pubClient: Redis;
-    if (upstashUrl) {
-      // Upstash provides a HTTPS endpoint; ioredis can connect via TLS on port 443
-      pubClient = new Redis(upstashUrl, { password: upstashToken, tls: {} , maxRetriesPerRequest: null});
-      console.log('✅ Using Upstash Redis (REST URL)');
+    if (upstashUrl && upstashToken) {
+      try {
+        const urlObj = new URL(upstashUrl);
+        const host = urlObj.hostname;
+        const port = Number(urlObj.port) || 6379;
+        // Using TLS (rediss) as Upstash requires secure connections
+        pubClient = new Redis({ host, port, password: upstashToken, tls: {} , maxRetriesPerRequest: null});
+        console.log('✅ Using Upstash Redis (TLS)');
+      } catch (e) {
+        console.error('⚠️ Failed to parse Upstash URL, falling back to standard config', e);
+        const host = configService.get<string>('redis.host');
+        const port = configService.get<number>('redis.port');
+        const password = configService.get<string>('redis.password');
+        pubClient = new Redis({ host, port, password, maxRetriesPerRequest: null });
+      }
     } else {
       const host = configService.get<string>('redis.host');
       const port = configService.get<number>('redis.port');
       const password = configService.get<string>('redis.password');
       pubClient = new Redis({ host, port, password, maxRetriesPerRequest: null });
-      console.log('✅ Using Standard Redis');
     }
 
     pubClient.on('error', (err) => {
