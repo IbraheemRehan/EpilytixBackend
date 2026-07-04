@@ -10,14 +10,14 @@ COPY package*.json ./
 
 # Install app dependencies
 ENV npm_config_engine_strict=false
-RUN npm install
-RUN chmod -R 755 ./node_modules/.bin
+RUN npm install && npm install -g @nestjs/cli
+
 
 # Bundle app source
 COPY . .
 
 # Build the app
-RUN npm run build
+RUN nest build
 
 # ---
 
