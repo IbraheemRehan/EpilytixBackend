@@ -21,11 +21,38 @@ const app_1 = require("firebase-admin/app");
 class RedisIoAdapter extends platform_socket_io_1.IoAdapter {
     adapterConstructor;
     async connectToRedis(configService) {
-        const host = configService.get('redis.host');
-        const port = configService.get('redis.port');
-        const password = configService.get('redis.password');
-        const pubClient = new ioredis_1.Redis({ host, port, password });
+        const upstashUrl = configService.get('redis.url');
+        const upstashToken = configService.get('redis.token');
+        let pubClient;
+        if (upstashUrl && upstashToken) {
+            try {
+                const urlObj = new URL(upstashUrl);
+                const host = urlObj.hostname;
+                const port = Number(urlObj.port) || 6379;
+                pubClient = new ioredis_1.Redis({ host, port, password: upstashToken, tls: {}, maxRetriesPerRequest: null });
+                console.log('✅ Using Upstash Redis (TLS)');
+            }
+            catch (e) {
+                console.error('⚠️ Failed to parse Upstash URL, falling back to standard config', e);
+                const host = configService.get('redis.host');
+                const port = configService.get('redis.port');
+                const password = configService.get('redis.password');
+                pubClient = new ioredis_1.Redis({ host, port, password, maxRetriesPerRequest: null });
+            }
+        }
+        else {
+            const host = configService.get('redis.host');
+            const port = configService.get('redis.port');
+            const password = configService.get('redis.password');
+            pubClient = new ioredis_1.Redis({ host, port, password, maxRetriesPerRequest: null });
+        }
+        pubClient.on('error', (err) => {
+            console.error('Redis PubClient error:', err);
+        });
         const subClient = pubClient.duplicate();
+        subClient.on('error', (err) => {
+            console.error('Redis SubClient error:', err);
+        });
         this.adapterConstructor = (0, redis_adapter_1.createAdapter)(pubClient, subClient);
     }
     createIOServer(port, options) {
@@ -53,8 +80,16 @@ async function bootstrap() {
     app.use((0, helmet_1.default)());
     app.use(compression());
     app.use((0, cookie_parser_1.default)());
+    const corsOrigins = configService.get('app.corsOrigins') || [];
     app.enableCors({
-        origin: true,
+        origin: (origin, callback) => {
+            if (!origin || corsOrigins.includes(origin) || configService.get('app.nodeEnv') === 'development') {
+                callback(null, true);
+            }
+            else {
+                callback(new Error('Not allowed by CORS'));
+            }
+        },
         credentials: true,
     });
     const prefix = configService.get('app.apiPrefix') || 'api/v1';

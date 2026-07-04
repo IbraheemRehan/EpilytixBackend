@@ -9,7 +9,7 @@ export declare class AuthService {
     private configService;
     private auditLogService;
     private readonly logger;
-    private transporter;
+    private resend;
     private otpStore;
     constructor(userModel: Model<UserDocument>, jwtService: JwtService, configService: ConfigService, auditLogService: AuditLogService);
     login(email: string, password: string, ip?: string, userAgent?: string): Promise<{

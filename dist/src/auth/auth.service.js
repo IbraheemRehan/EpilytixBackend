@@ -54,7 +54,7 @@ const mongoose_1 = require("@nestjs/mongoose");
 const mongoose_2 = require("mongoose");
 const bcrypt = __importStar(require("bcryptjs"));
 const { authenticator } = require('otplib');
-const nodemailer = __importStar(require("nodemailer"));
+const resend_1 = require("resend");
 const user_schema_1 = require("../users/schemas/user.schema");
 const audit_service_1 = require("../audit-logs/audit.service");
 let AuthService = AuthService_1 = class AuthService {
@@ -63,21 +63,16 @@ let AuthService = AuthService_1 = class AuthService {
     configService;
     auditLogService;
     logger = new common_1.Logger(AuthService_1.name);
-    transporter;
+    resend;
     otpStore = new Map();
     constructor(userModel, jwtService, configService, auditLogService) {
         this.userModel = userModel;
         this.jwtService = jwtService;
         this.configService = configService;
         this.auditLogService = auditLogService;
-        const smtp = this.configService.get('app.smtp');
-        if (smtp?.user && smtp?.pass) {
-            this.transporter = nodemailer.createTransport({
-                host: smtp.host,
-                port: smtp.port,
-                secure: smtp.port === 465,
-                auth: { user: smtp.user, pass: smtp.pass },
-            });
+        const resendApiKey = this.configService.get('app.resend.apiKey');
+        if (resendApiKey) {
+            this.resend = new resend_1.Resend(resendApiKey);
         }
     }
     async login(email, password, ip, userAgent) {
@@ -255,10 +250,10 @@ let AuthService = AuthService_1 = class AuthService {
             resetPasswordOtpExpires: expires,
         });
         this.logger.log(`[DEV] Reset Password OTP for ${user.email}: ${otp}`);
-        if (this.transporter) {
+        if (this.resend) {
             try {
-                await this.transporter.sendMail({
-                    from: `"Epilytix Security" <${this.configService.get('app.smtp.user')}>`,
+                await this.resend.emails.send({
+                    from: 'Epilytix Security <onboarding@resend.dev>',
                     to: user.email,
                     subject: 'Password Reset Request',
                     html: `
@@ -341,10 +336,10 @@ let AuthService = AuthService_1 = class AuthService {
             expiresAt: Date.now() + expirySeconds * 1000,
         });
         this.logger.log(`[DEV] OTP for ${user.email}: ${otp}`);
-        if (this.transporter) {
+        if (this.resend) {
             try {
-                await this.transporter.sendMail({
-                    from: `"Epilytix Security" <${this.configService.get('app.smtp.user')}>`,
+                await this.resend.emails.send({
+                    from: 'Epilytix Security <onboarding@resend.dev>',
                     to: user.email,
                     subject: 'Your Epilytix Login Verification Code',
                     html: `

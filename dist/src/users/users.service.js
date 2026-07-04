@@ -59,7 +59,7 @@ const audit_service_1 = require("../audit-logs/audit.service");
 const notifications_service_1 = require("../notifications/notifications.service");
 const notification_schema_1 = require("../notifications/schemas/notification.schema");
 const config_1 = require("@nestjs/config");
-const nodemailer = __importStar(require("nodemailer"));
+const resend_1 = require("resend");
 let UsersService = class UsersService {
     userModel;
     announcementModel;
@@ -68,7 +68,7 @@ let UsersService = class UsersService {
     auditLogService;
     notificationsService;
     configService;
-    transporter;
+    resend;
     constructor(userModel, announcementModel, leadModel, taskModel, auditLogService, notificationsService, configService) {
         this.userModel = userModel;
         this.announcementModel = announcementModel;
@@ -77,14 +77,9 @@ let UsersService = class UsersService {
         this.auditLogService = auditLogService;
         this.notificationsService = notificationsService;
         this.configService = configService;
-        const smtp = this.configService.get('app.smtp');
-        if (smtp?.user && smtp?.pass) {
-            this.transporter = nodemailer.createTransport({
-                host: smtp.host,
-                port: smtp.port,
-                secure: smtp.port === 465,
-                auth: { user: smtp.user, pass: smtp.pass },
-            });
+        const resendApiKey = this.configService.get('app.resend.apiKey');
+        if (resendApiKey) {
+            this.resend = new resend_1.Resend(resendApiKey);
         }
     }
     async getMyLogins(userId) {
@@ -174,10 +169,10 @@ let UsersService = class UsersService {
             resourceId: user._id.toString(),
             details: { email: user.email },
         });
-        if (this.transporter) {
+        if (this.resend) {
             try {
-                await this.transporter.sendMail({
-                    from: `"Epilytix Admin" <${this.configService.get('app.smtp.user')}>`,
+                await this.resend.emails.send({
+                    from: 'Epilytix Admin <onboarding@resend.dev>',
                     to: user.email,
                     subject: 'Welcome to Epilytix Dashboard',
                     html: `

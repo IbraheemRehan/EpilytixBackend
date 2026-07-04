@@ -19,6 +19,9 @@ export default registerAs('app', () => ({
     user: process.env.SMTP_USER || '',
     pass: process.env.SMTP_PASS || '',
   },
+  resend: {
+    apiKey: process.env.RESEND_API_KEY || '',
+  },
   firebase: {
     projectId: process.env.FIREBASE_PROJECT_ID || '',
     privateKey: (process.env.FIREBASE_PRIVATE_KEY || '').replace(/\\n/g, '\n'),

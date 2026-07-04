@@ -18,7 +18,7 @@ export declare class UsersService {
     private auditLogService;
     private notificationsService;
     private configService;
-    private transporter;
+    private resend;
     constructor(userModel: Model<UserDocument>, announcementModel: Model<AnnouncementDocument>, leadModel: Model<LeadDocument>, taskModel: Model<TaskDocument>, auditLogService: AuditLogService, notificationsService: NotificationsService, configService: ConfigService);
     getMyLogins(userId: string): Promise<{
         logins: {

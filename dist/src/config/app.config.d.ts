@@ -17,6 +17,9 @@ declare const _default: (() => {
         user: string;
         pass: string;
     };
+    resend: {
+        apiKey: string;
+    };
     firebase: {
         projectId: string;
         privateKey: string;
@@ -55,6 +58,9 @@ declare const _default: (() => {
         port: number;
         user: string;
         pass: string;
+    };
+    resend: {
+        apiKey: string;
     };
     firebase: {
         projectId: string;

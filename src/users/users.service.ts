@@ -21,11 +21,11 @@ import { AuditLogService } from '../audit-logs/audit.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationType } from '../notifications/schemas/notification.schema';
 import { ConfigService } from '@nestjs/config';
-import * as nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 
 @Injectable()
 export class UsersService {
-  private transporter: nodemailer.Transporter;
+  private resend: Resend;
 
   constructor(
     @InjectModel(User.name) private userModel: Model<UserDocument>,
@@ -36,14 +36,9 @@ export class UsersService {
     private notificationsService: NotificationsService,
     private configService: ConfigService,
   ) {
-    const smtp = this.configService.get('app.smtp');
-    if (smtp?.user && smtp?.pass) {
-      this.transporter = nodemailer.createTransport({
-        host: smtp.host,
-        port: smtp.port,
-        secure: smtp.port === 465,
-        auth: { user: smtp.user, pass: smtp.pass },
-      });
+    const resendApiKey = this.configService.get('app.resend.apiKey');
+    if (resendApiKey) {
+      this.resend = new Resend(resendApiKey);
     }
   }
 
@@ -154,10 +149,10 @@ export class UsersService {
     });
 
     // Send invitation email with temp password
-    if (this.transporter) {
+    if (this.resend) {
       try {
-        await this.transporter.sendMail({
-          from: `"Epilytix Admin" <${this.configService.get('app.smtp.user')}>`,
+        await this.resend.emails.send({
+          from: 'Epilytix Admin <onboarding@resend.dev>',
           to: user.email,
           subject: 'Welcome to Epilytix Dashboard',
           html: `

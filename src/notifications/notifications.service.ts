@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { App, getApps, getApp } from 'firebase-admin/app';
 import { getMessaging, MulticastMessage } from 'firebase-admin/messaging';
-import * as nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Notification, NotificationDocument, NotificationType } from './schemas/notification.schema';
@@ -14,7 +14,7 @@ import { NotificationsGateway } from './notifications.gateway';
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
   private firebaseApp: App;
-  private transporter: nodemailer.Transporter;
+  private resend: Resend;
 
   constructor(
     private configService: ConfigService,
@@ -33,24 +33,13 @@ export class NotificationsService {
       this.logger.warn('Firebase configuration missing. Push notifications disabled.');
     }
 
-    const smtpHost = this.configService.get('app.smtp.host');
-    const smtpPort = this.configService.get('app.smtp.port');
-    const smtpUser = this.configService.get('app.smtp.user');
-    const smtpPass = this.configService.get('app.smtp.pass');
+    const resendApiKey = this.configService.get('app.resend.apiKey');
 
-    if (smtpHost && smtpUser) {
-      this.transporter = nodemailer.createTransport({
-        host: smtpHost,
-        port: smtpPort,
-        secure: smtpPort === 465,
-        auth: {
-          user: smtpUser,
-          pass: smtpPass,
-        },
-      });
-      this.logger.log('Nodemailer initialized for notifications');
+    if (resendApiKey) {
+      this.resend = new Resend(resendApiKey);
+      this.logger.log('Resend initialized for notifications');
     } else {
-      this.logger.warn('SMTP configuration missing. Email notifications disabled.');
+      this.logger.warn('Resend configuration missing. Email notifications disabled.');
     }
   }
 

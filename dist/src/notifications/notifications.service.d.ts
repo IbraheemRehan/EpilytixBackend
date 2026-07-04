@@ -10,7 +10,7 @@ export declare class NotificationsService {
     private readonly gateway;
     private readonly logger;
     private firebaseApp;
-    private transporter;
+    private resend;
     constructor(configService: ConfigService, notificationModel: Model<NotificationDocument>, userModel: Model<UserDocument>, gateway: NotificationsGateway);
     sendNotification(recipientId: string, type: NotificationType, title: string, body: string, data?: Record<string, string>): Promise<void>;
     getUserNotifications(userId: string, limit?: number, skip?: number): Promise<{

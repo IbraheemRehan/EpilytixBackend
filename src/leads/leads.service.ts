@@ -18,11 +18,11 @@ import { NotificationsService } from '../notifications/notifications.service';
 import { NotificationType } from '../notifications/schemas/notification.schema';
 import { NewsletterService } from '../newsletter/newsletter.service';
 import { ConfigService } from '@nestjs/config';
-import * as nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 
 @Injectable()
 export class LeadsService {
-  private transporter: nodemailer.Transporter;
+  private resend: Resend;
 
   constructor(
     @InjectModel(Lead.name) private leadModel: Model<LeadDocument>,
@@ -33,14 +33,9 @@ export class LeadsService {
     private newsletterService: NewsletterService,
     private configService: ConfigService,
   ) {
-    const smtp = this.configService.get('app.smtp');
-    if (smtp?.user && smtp?.pass) {
-      this.transporter = nodemailer.createTransport({
-        host: smtp.host,
-        port: smtp.port,
-        secure: smtp.port === 465,
-        auth: { user: smtp.user, pass: smtp.pass },
-      });
+    const resendApiKey = this.configService.get('app.resend.apiKey');
+    if (resendApiKey) {
+      this.resend = new Resend(resendApiKey);
     }
   }
 
@@ -156,11 +151,11 @@ export class LeadsService {
         `,
       )
       .join('\n');    // Send detailed consultation request email to the Epilytix company email
-    if (this.transporter) {
+    if (this.resend) {
       try {
-        const companyEmail = this.configService.get('app.smtp.user');
-        await this.transporter.sendMail({
-          from: `"Epilytix Consultations" <${companyEmail}>`,
+        const companyEmail = this.configService.get('app.ceo.email') || 'epilytix.official@gmail.com';
+        await this.resend.emails.send({
+          from: 'Epilytix Consultations <onboarding@resend.dev>',
           to: companyEmail,
           subject: `[New Lead] Consultation Request from ${lead.name}`,
           html: `

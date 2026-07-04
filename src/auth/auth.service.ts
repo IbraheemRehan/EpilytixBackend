@@ -10,14 +10,14 @@ import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import * as bcrypt from 'bcryptjs';
 const { authenticator } = require('otplib');
-import * as nodemailer from 'nodemailer';
+import { Resend } from 'resend';
 import { User, UserDocument, UserRole } from '../users/schemas/user.schema';
 import { AuditLogService } from '../audit-logs/audit.service';
 
 @Injectable()
 export class AuthService {
   private readonly logger = new Logger(AuthService.name);
-  private transporter: nodemailer.Transporter;
+  private resend: Resend;
   // In-memory OTP store for dev; production should use Redis
   private otpStore = new Map<string, { otp: string; userId: string; expiresAt: number }>();
 
@@ -27,14 +27,9 @@ export class AuthService {
     private configService: ConfigService,
     private auditLogService: AuditLogService,
   ) {
-    const smtp = this.configService.get('app.smtp');
-    if (smtp?.user && smtp?.pass) {
-      this.transporter = nodemailer.createTransport({
-        host: smtp.host,
-        port: smtp.port,
-        secure: smtp.port === 465,
-        auth: { user: smtp.user, pass: smtp.pass },
-      });
+    const resendApiKey = this.configService.get('app.resend.apiKey');
+    if (resendApiKey) {
+      this.resend = new Resend(resendApiKey);
     }
   }
 
@@ -264,10 +259,10 @@ export class AuthService {
 
     this.logger.log(`[DEV] Reset Password OTP for ${user.email}: ${otp}`);
 
-    if (this.transporter) {
+    if (this.resend) {
       try {
-        await this.transporter.sendMail({
-          from: `"Epilytix Security" <${this.configService.get('app.smtp.user')}>`,
+        await this.resend.emails.send({
+          from: 'Epilytix Security <onboarding@resend.dev>',
           to: user.email,
           subject: 'Password Reset Request',
           html: `
@@ -382,10 +377,10 @@ export class AuthService {
     this.logger.log(`[DEV] OTP for ${user.email}: ${otp}`);
 
     // Send email if transporter is configured
-    if (this.transporter) {
+    if (this.resend) {
       try {
-        await this.transporter.sendMail({
-          from: `"Epilytix Security" <${this.configService.get('app.smtp.user')}>`,
+        await this.resend.emails.send({
+          from: 'Epilytix Security <onboarding@resend.dev>',
           to: user.email,
           subject: 'Your Epilytix Login Verification Code',
           html: `
