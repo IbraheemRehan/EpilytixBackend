@@ -11,6 +11,7 @@ ENV npm_config_engine_strict=false
 
 # <<<=== CHANGE THIS LINE ==============================================
 RUN npm install                     # use npm install instead of npm ci
+RUN chmod -R 755 ./node_modules/.bin
 # =====================================================================
 
 # Copy source & compile
