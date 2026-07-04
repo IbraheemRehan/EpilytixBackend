@@ -15,7 +15,7 @@ COPY . .
 RUN npm run build
 
 # Verify the build output exists
-RUN ls -la dist/ && ls dist/main.js
+RUN ls -la dist/src/ && ls dist/src/main.js
 
 # ---------- Production -----------------------------------------------
 FROM node:22-alpine AS production
@@ -27,4 +27,4 @@ COPY --from=builder /usr/src/app/node_modules ./node_modules
 COPY --from=builder /usr/src/app/package.json ./
 
 ENV NODE_ENV=production
-CMD ["node", "dist/main.js"]
+CMD ["node", "dist/src/main.js"]
