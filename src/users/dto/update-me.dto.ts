@@ -1,4 +1,4 @@
-import { IsString, IsOptional, IsUrl } from 'class-validator';
+import { IsString, IsOptional, IsUrl, IsBoolean } from 'class-validator';
 
 export class UpdateMeDto {
   @IsString()
@@ -16,4 +16,8 @@ export class UpdateMeDto {
   @IsString()
   @IsOptional()
   companyRole?: string;
+
+  @IsBoolean()
+  @IsOptional()
+  isOnboarded?: boolean;
 }

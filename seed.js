@@ -15,6 +15,8 @@ async function seed() {
 
   if (existing) {
     console.log('CEO already exists:', existing);
+    await users.updateOne({ email: ceoEmail.toLowerCase() }, { $set: { isOnboarded: true } });
+    console.log('CEO onboarding status set to true');
   } else {
     console.log('CEO not found. Creating one...');
     const passwordHash = await bcrypt.hash('EpilytixCEO@2024!', 10);
@@ -25,6 +27,7 @@ async function seed() {
       firstName: 'Ibraheem',
       lastName: 'Rehan',
       isActive: true,
+      isOnboarded: true,
       twoFactorEnabled: false,
       permissions: {
         canManageLeads: true,

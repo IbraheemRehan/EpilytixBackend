@@ -86,7 +86,12 @@ export class ContentService {
   }
 
   private checkPermissions(user: any) {
-    if (user.role !== UserRole.CEO && !user.permissions?.canManageContent) {
+    // CEO and co-founders manage website content from the mobile app
+    if (
+      user.role !== UserRole.CEO &&
+      user.role !== UserRole.FOUNDER &&
+      !user.permissions?.canManageContent
+    ) {
       throw new ForbiddenException('You do not have permission to manage content');
     }
   }

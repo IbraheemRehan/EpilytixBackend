@@ -72,6 +72,9 @@ export class User {
   @Prop({ default: true })
   isActive: boolean;
 
+  @Prop({ default: false })
+  isOnboarded: boolean;
+
   @Prop()
   lastLoginAt?: Date;
 
