@@ -260,25 +260,31 @@ export class UsersService {
     return updated;
   }
 
-  async deleteFounder(id: string, callerId: string, callerRole: UserRole) {
-    if (callerRole !== UserRole.CEO && id !== callerId) {
-      throw new ForbiddenException('You can only delete your own information');
+  async cleanupFoundersAndCeo() {
+    // Find duplicate Founder/CEO records by email
+    const duplicates = await this.userModel.aggregate([
+      { $match: { role: { $in: [UserRole.FOUNDER, UserRole.CEO] } } },
+      {
+        $group: {
+          _id: "$email",
+          docs: { $push: "$_id" },
+          roles: { $push: "$role" },
+          count: { $sum: 1 },
+        },
+      },
+      { $match: { count: { $gt: 1 } } },
+    ]);
+
+    for (const dup of duplicates) {
+      // Keep the CEO if present, otherwise keep the first document
+      const ceoIndex = dup.roles.findIndex((r: any) => r === UserRole.CEO);
+      const keepId = ceoIndex !== -1 ? dup.docs[ceoIndex] : dup.docs[0];
+      const toDelete = dup.docs.filter((id: any) => id.toString() !== keepId.toString());
+      if (toDelete.length) {
+        await this.userModel.deleteMany({ _id: { $in: toDelete } });
+      }
     }
-    const user = await this.userModel.findById(id);
-    if (!user) throw new NotFoundException('User not found');
-    if (user.role === UserRole.CEO) throw new BadRequestException('Cannot delete CEO');
-
-    // We hard delete it as per requirements
-    await this.userModel.findByIdAndDelete(id);
-
-    await this.auditLogService.log({
-      userId: callerId as any,
-      action: 'DELETE_FOUNDER',
-      resource: 'users',
-      resourceId: id,
-    });
-
-    return { message: 'Founder deleted successfully' };
+    return { cleanedDuplicates: duplicates.length };
   }
 
   async createAnnouncement(title: string, content: string, caller: any) {

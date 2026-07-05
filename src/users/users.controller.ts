@@ -102,14 +102,11 @@ export class UsersController {
     return this.usersService.updatePermissions(id, updatePermissionsDto, ceoId);
   }
 
-  @Delete('founders/:id')
-  @Roles(UserRole.CEO, UserRole.FOUNDER)
-  removeFounder(
-    @Param('id') id: string,
-    @CurrentUser('userId') callerId: string,
-    @CurrentUser('role') callerRole: UserRole,
-  ) {
-    return this.usersService.deleteFounder(id, callerId, callerRole);
+  @Post('admin/cleanup-founders')
+  @Roles(UserRole.CEO)
+  cleanupFounders(@CurrentUser('userId') ceoId: string) {
+    // CEO can trigger cleanup; ignore callerId since method doesn't need it
+    return this.usersService.cleanupFoundersAndCeo();
   }
 
   @Post('announcements')
