@@ -620,6 +620,23 @@ export class LeadsService {
     // Calculate required votes (51% majority)
     const requiredVotes = Math.floor(activeFounders * 0.5) + 1;
 
+    // If only one founder exists (requiredVotes === 1), auto-approve and delete immediately
+    if (requiredVotes === 1) {
+      // Build a minimal deletion request object for audit/logging purposes
+      const autoDeletionRequest: any = {
+        leadId: new Types.ObjectId(leadId),
+        leadName:
+          lead.name ||
+          `${(lead as any).firstName || ''} ${(lead as any).lastName || ''}`.trim(),
+        requestedBy: new Types.ObjectId(caller.userId),
+        approvals: [new Types.ObjectId(caller.userId)],
+        requiredVotes,
+        status: DeletionRequestStatus.APPROVED,
+      };
+      // Directly execute deletion without persisting a pending request
+      return this._executeDeletion(autoDeletionRequest, lead, caller);
+    }
+
     // Create the deletion request with the requester's vote auto-applied
     const deletionRequest = new this.deletionRequestModel({
       leadId: new Types.ObjectId(leadId),
@@ -631,7 +648,7 @@ export class LeadsService {
     });
     await deletionRequest.save();
 
-    // If only 1 founder exists and 1 vote is enough, auto-approve
+    // If the requester's vote already meets the required votes (covers edge case where requiredVotes could be 1), auto-approve
     if (deletionRequest.approvals.length >= requiredVotes) {
       return this._executeDeletion(deletionRequest, lead, caller);
     }
@@ -643,9 +660,10 @@ export class LeadsService {
       _id: { $ne: new Types.ObjectId(caller.userId) },
     }).select('_id').exec();
 
-    const requesterName = (await this.userModel.findById(caller.userId).select('firstName lastName'))
-      ? await this.userModel.findById(caller.userId).select('firstName lastName').lean()
-      : null;
+    const requesterName = await this.userModel
+      .findById(caller.userId)
+      .select('firstName lastName')
+      .lean();
     const requesterDisplay = requesterName
       ? `${requesterName.firstName} ${requesterName.lastName}`
       : 'A founder';
@@ -669,7 +687,64 @@ export class LeadsService {
     };
   }
 
+  /**
+   * Recalculates requiredVotes for every PENDING deletion request based on the
+   * CURRENT count of active founders, and auto-executes deletion for any
+   * request whose existing approvals already meet the (possibly new) threshold.
+   *
+   * IMPORTANT: this runs against raw (unpopulated) documents so that `.save()`
+   * calls don't choke on populated ref fields, and each request is handled in
+   * its own try/catch so one bad/corrupt request can't block the rest (which
+   * was previously causing the whole endpoint to throw and the mobile app to
+   * silently keep showing stale vote counts).
+   *
+   * Call this any time the active-founder set changes (add/deactivate/delete
+   * a founder), in addition to it running on every fetch/vote.
+   */
+  async recalculateAndResolvePendingDeletions() {
+    const activeFoundersCount = await this.userModel.countDocuments({
+      role: { $in: [UserRole.CEO, UserRole.FOUNDER] },
+      isActive: true,
+    });
+    const currentRequiredVotes = Math.floor(activeFoundersCount * 0.5) + 1;
+
+    // Work with raw (unpopulated) docs so .save() is safe
+    const pendingRequests = await this.deletionRequestModel
+      .find({ status: DeletionRequestStatus.PENDING })
+      .exec();
+
+    for (const req of pendingRequests) {
+      try {
+        if (req.requiredVotes !== currentRequiredVotes) {
+          req.requiredVotes = currentRequiredVotes;
+          await req.save();
+        }
+
+        if (req.approvals.length >= currentRequiredVotes) {
+          // Threshold is now met (e.g. founders were removed) — execute automatically
+          const lead = await this.leadModel.findById(req.leadId);
+          const systemCaller = {
+            userId: req.requestedBy.toString(),
+            role: UserRole.CEO,
+          };
+          await this._executeDeletion(req, lead, systemCaller);
+        }
+      } catch (err) {
+        this.logger.error(
+          `Failed to recalculate/resolve deletion request ${req._id}`,
+          err?.message || err,
+        );
+        // Continue processing remaining requests instead of failing the whole batch
+      }
+    }
+  }
+
   async getDeleteRequests() {
+    // Recalculate thresholds and auto-resolve anything that now qualifies
+    // BEFORE reading the populated list back out for the client.
+    await this.recalculateAndResolvePendingDeletions();
+
+    // Return only still-pending requests (any auto-approved ones are now APPROVED)
     return this.deletionRequestModel
       .find({ status: DeletionRequestStatus.PENDING })
       .populate('requestedBy', 'firstName lastName email')
@@ -693,6 +768,13 @@ export class LeadsService {
     if (alreadyVoted) {
       throw new ConflictException('You have already voted on this request');
     }
+
+    // Update required votes based on current active founders
+    const activeFoundersCount = await this.userModel.countDocuments({
+      role: { $in: [UserRole.CEO, UserRole.FOUNDER] },
+      isActive: true,
+    });
+    deletionRequest.requiredVotes = Math.floor(activeFoundersCount * 0.5) + 1;
 
     // Add the vote
     deletionRequest.approvals.push(new Types.ObjectId(caller.userId));
