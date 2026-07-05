@@ -1,3 +1,6 @@
+import * as dotenv from 'dotenv';
+dotenv.config(); // Ensure process.env is populated BEFORE anything else runs
+
 import { NestFactory, Reflector } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -15,6 +18,30 @@ import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
 import { initializeApp, getApps, cert } from 'firebase-admin/app';
 
+// ---------------------------------------------------------------------------
+// Initialize Firebase Admin globally — BEFORE Nest builds the module tree.
+// This must run before NestFactory.create(AppModule), because that call
+// instantiates every provider (including NotificationsService's constructor,
+// which checks getApps().length synchronously). If Firebase is initialized
+// after NestFactory.create(), that check always fails even with valid env vars.
+// ---------------------------------------------------------------------------
+if (!getApps().length) {
+  const projectId = process.env.FIREBASE_PROJECT_ID;
+  const clientEmail = process.env.FIREBASE_CLIENT_EMAIL;
+  const privateKey = process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n');
+
+  if (projectId && clientEmail && privateKey) {
+    initializeApp({
+      credential: cert({ projectId, clientEmail, privateKey }),
+    });
+    console.log('🔥 Firebase Admin globally initialized');
+  } else {
+    console.warn(
+      '⚠️ Firebase env vars missing at bootstrap — push notifications disabled',
+    );
+  }
+}
+
 // Custom Redis IoAdapter
 export class RedisIoAdapter extends IoAdapter {
   private adapterConstructor: ReturnType<typeof createAdapter>;
@@ -29,7 +56,7 @@ export class RedisIoAdapter extends IoAdapter {
         const host = urlObj.hostname;
         const port = Number(urlObj.port) || 6379;
         // Using TLS (rediss) as Upstash requires secure connections
-        pubClient = new Redis({ host, port, password: upstashToken, tls: {} , maxRetriesPerRequest: null});
+        pubClient = new Redis({ host, port, password: upstashToken, tls: {}, maxRetriesPerRequest: null });
         console.log('✅ Using Upstash Redis (TLS)');
       } catch (e) {
         console.error('⚠️ Failed to parse Upstash URL, falling back to standard config', e);
@@ -68,24 +95,11 @@ async function bootstrap() {
   const configService = app.get(ConfigService);
   const reflector = app.get(Reflector);
 
-  // Initialize Firebase Admin globally
-  if (!getApps().length) {
-    const projectId = configService.get<string>('app.firebase.projectId');
-    const clientEmail = configService.get<string>('app.firebase.clientEmail');
-    const privateKey = configService.get<string>('app.firebase.privateKey');
-    if (projectId && clientEmail && privateKey) {
-      initializeApp({
-        credential: cert({ projectId, clientEmail, privateKey }),
-      });
-      console.log('🔥 Firebase Admin globally initialized');
-    }
-  }
-
   // Security & Performance Middlewares
   app.use(helmet());
   app.use(compression());
   app.use(cookieParser());
-  
+
   // Secure CORS — allow configured origins, allow mobile apps (no origin header), and allow all in development
   const corsOrigins = configService.get<string[]>('app.corsOrigins') || [];
   app.enableCors({
@@ -113,7 +127,7 @@ async function bootstrap() {
   );
   app.useGlobalFilters(new AllExceptionsFilter());
   app.useGlobalInterceptors(new TransformInterceptor());
-  
+
   // Notice we don't bind JwtAuthGuard globally here if we do it in modules or controllers,
   // but it's cleaner to bind it globally and use @Public()
   // Actually, we bound it in controllers in this architecture.
