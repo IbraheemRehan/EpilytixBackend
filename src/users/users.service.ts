@@ -179,8 +179,8 @@ export class UsersService {
 
   async findAllFounders() {
     return this.userModel
-      .find({ role: { $in: [UserRole.FOUNDER, UserRole.CEO] }, isActive: true })
-      .select('firstName lastName role avatar')
+      .find({ role: { $in: [UserRole.FOUNDER, UserRole.CEO] } })
+      .select('firstName lastName email role isActive avatar companyRole permissions')
       .lean()
       .sort({ createdAt: -1 })
       .exec();
@@ -397,5 +397,49 @@ export class UsersService {
       tasks: lastTask ? new Date((lastTask as any).createdAt) > lastSeenTasks : false,
       announcements: lastAnnouncement ? new Date((lastAnnouncement as any).createdAt) > lastSeenAnnouncements : false,
     };
+  }
+
+  async deleteFounder(id: string, callerId: string, callerRole: UserRole) {
+    if (callerRole !== UserRole.CEO && id !== callerId) {
+      throw new ForbiddenException('You can only delete your own profile');
+    }
+    const user = await this.userModel.findById(id);
+    if (!user) throw new NotFoundException('User not found');
+    if (user.role === UserRole.CEO) throw new ForbiddenException('Cannot delete CEO');
+
+    await this.userModel.findByIdAndDelete(id);
+
+    await this.auditLogService.log({
+      userId: callerId as any,
+      action: 'DELETE_FOUNDER',
+      resource: 'users',
+      resourceId: id,
+      details: { email: user.email },
+    });
+
+    return { success: true };
+  }
+
+  async deleteAnnouncement(id: string, callerId: string, callerRole: UserRole) {
+    const announcement = await this.announcementModel.findById(id);
+    if (!announcement) {
+      throw new NotFoundException('Announcement not found');
+    }
+
+    if (callerRole !== UserRole.CEO && announcement.createdBy.toString() !== callerId) {
+      throw new ForbiddenException('You can only delete your own announcements');
+    }
+
+    await this.announcementModel.findByIdAndDelete(id);
+
+    await this.auditLogService.log({
+      userId: callerId as any,
+      action: 'DELETE_ANNOUNCEMENT',
+      resource: 'announcements',
+      resourceId: id,
+      details: { title: announcement.title },
+    });
+
+    return { success: true };
   }
 }

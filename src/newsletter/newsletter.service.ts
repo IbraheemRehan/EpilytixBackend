@@ -52,7 +52,7 @@ export class NewsletterService {
     const rows = items.map(item => [
       item.email,
       item.status,
-      item.createdAt.toISOString()
+      item.createdAt ? new Date(item.createdAt).toISOString() : ''
     ]);
     
     return [

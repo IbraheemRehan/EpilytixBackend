@@ -130,4 +130,24 @@ export class UsersController {
   ) {
     return this.usersService.acknowledgeAnnouncement(id, userId);
   }
+
+  @Delete('founders/:id')
+  @Roles(UserRole.CEO, UserRole.FOUNDER)
+  deleteFounder(
+    @Param('id') id: string,
+    @CurrentUser('userId') callerId: string,
+    @CurrentUser('role') callerRole: UserRole,
+  ) {
+    return this.usersService.deleteFounder(id, callerId, callerRole);
+  }
+
+  @Delete('announcements/:id')
+  @Roles(UserRole.CEO, UserRole.FOUNDER)
+  deleteAnnouncement(
+    @Param('id') id: string,
+    @CurrentUser('userId') callerId: string,
+    @CurrentUser('role') callerRole: UserRole,
+  ) {
+    return this.usersService.deleteAnnouncement(id, callerId, callerRole);
+  }
 }
