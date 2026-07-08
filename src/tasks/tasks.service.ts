@@ -134,7 +134,11 @@ export class TasksService {
     if (!originalTask) throw new NotFoundException('Task not found');
 
     const updateData: any = { ...updateTaskDto };
-    delete updateData.assignee; // Assignee cannot be changed after creation
+    if (updateTaskDto.assignee) {
+      updateData.assignee = new Types.ObjectId(updateTaskDto.assignee);
+    } else {
+      delete updateData.assignee; // Don't overwrite if not provided
+    }
     
     if (updateTaskDto.relatedLead) {
       updateData.relatedLead = new Types.ObjectId(updateTaskDto.relatedLead);
@@ -197,6 +201,58 @@ export class TasksService {
       }
     }
 
+    // ── Task COMPLETED → notify all workflow users ────────────────────────
+    if (
+      updateData.status === TaskStatus.COMPLETED &&
+      originalTask.status !== TaskStatus.COMPLETED
+    ) {
+      try {
+        const completerName = `${user.firstName || ''} ${user.lastName || ''}`.trim() || 'A team member';
+        const creatorId = originalTask.createdBy?.toString();
+
+        // Notify the task creator if they're not the one completing it
+        if (creatorId && creatorId !== user.userId) {
+          await this.notificationsService.sendNotification(
+            creatorId,
+            NotificationType.TASK_COMPLETED,
+            '✅ Task Completed',
+            `${completerName} marked "${updated.title}" as completed.`,
+            {
+              resourceId: updated._id.toString(),
+              resourceType: 'Task',
+            }
+          );
+        }
+
+        // Notify all active founders/CEOs in the workflow
+        const activeFounders = await this.userModel.find({
+          role: { $in: [UserRole.FOUNDER, UserRole.CEO] },
+          isActive: true,
+        });
+
+        for (const founder of activeFounders) {
+          if (
+            founder._id.toString() === user.userId ||
+            founder._id.toString() === creatorId
+          ) continue;
+
+          await this.notificationsService.sendNotification(
+            founder._id.toString(),
+            NotificationType.TASK_COMPLETED,
+            '✅ Task Completed',
+            `${completerName} marked "${updated.title}" as completed.`,
+            {
+              resourceId: updated._id.toString(),
+              resourceType: 'Task',
+            }
+          );
+        }
+      } catch (err) {
+        console.error('Failed to send task completion notifications:', err);
+      }
+    }
+
+    // ── Status change audit log ───────────────────────────────────────────
     if (updateData.status) {
       await this.auditLogService.log({
         userId: new Types.ObjectId(user.userId),

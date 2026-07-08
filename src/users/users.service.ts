@@ -43,11 +43,11 @@ export class UsersService {
   }
 
   async getMyLogins(userId: string) {
-    const logins = await this.auditLogService.getLogs({
+    const result = await this.auditLogService.getLogs({
       userId,
-      action: { $in: ['LOGIN_SUCCESS', 'LOGIN_FAILED'] },
+      action: { $in: ['LOGIN_SUCCESS', 'LOGIN_FAILED', 'LOGIN_2FA_SUCCESS'] },
     }, { limit: 20 });
-    return { logins };
+    return { logins: result.items };
   }
 
   async updateMyProfile(userId: string, updateMeDto: UpdateMeDto) {
