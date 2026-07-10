@@ -468,6 +468,52 @@ export class LeadsService {
 
     if (!updated) throw new NotFoundException('Lead not found after update');
 
+    // Send notifications for Lead Assignment or Status Change
+    try {
+      const updaterDoc = await this.userModel.findById(user.userId).select('firstName lastName').lean();
+      const updaterName = updaterDoc ? `${updaterDoc.firstName} ${updaterDoc.lastName}` : 'A founder';
+
+      if (updateLeadDto.assignedTo && (!lead.assignedTo || lead.assignedTo.toString() !== updateLeadDto.assignedTo)) {
+        await this.notificationsService.sendNotification(
+          updateLeadDto.assignedTo,
+          NotificationType.LEAD_ASSIGNED,
+          'Lead Assigned to You',
+          `Lead "${lead.name}" has been assigned to you by ${updaterName}.`,
+          {
+            resourceId: id,
+            resourceType: 'Lead',
+          }
+        );
+      }
+
+      if (updateLeadDto.status && lead.status !== updateLeadDto.status) {
+        const recipients = new Set<string>();
+        if (lead.assignedTo) {
+          recipients.add(lead.assignedTo.toString());
+        }
+        const ceos = await this.userModel.find({ role: UserRole.CEO, isActive: true }).select('_id').exec();
+        for (const ceo of ceos) {
+          recipients.add(ceo._id.toString());
+        }
+        recipients.delete(user.userId);
+
+        for (const recipient of recipients) {
+          await this.notificationsService.sendNotification(
+            recipient,
+            NotificationType.LEAD_STATUS_CHANGED,
+            'Lead Status Updated',
+            `Lead "${lead.name}" status changed to ${updateLeadDto.status} by ${updaterName}.`,
+            {
+              resourceId: id,
+              resourceType: 'Lead',
+            }
+          );
+        }
+      }
+    } catch (notifErr) {
+      this.logger.error('Failed to dispatch lead update notifications:', notifErr);
+    }
+
     if (updateLeadDto.status) {
       await this.auditLogService.log({
         userId: new Types.ObjectId(user.userId),

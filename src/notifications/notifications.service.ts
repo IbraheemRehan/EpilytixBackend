@@ -87,38 +87,92 @@ export class NotificationsService {
 
     // Send Push
     const user = await this.userModel.findById(recipientId).select('email fcmTokens').exec();
-    if (!user) return;
+    if (!user || !user.fcmTokens?.length) return;
 
-    if (!this.firebaseApp || !user.fcmTokens?.length) return;
+    const tokens = user.fcmTokens;
+    const expoTokens = tokens.filter(
+      (t) =>
+        t.startsWith('ExponentPushToken') ||
+        t.startsWith('ExpoPushToken') ||
+        t.includes('ExponentPushToken') ||
+        t.includes('ExpoPushToken'),
+    );
+    const fcmTokens = tokens.filter((t) => !expoTokens.includes(t));
 
-    try {
-      const message: MulticastMessage = {
-        tokens: user.fcmTokens,
-        notification: { title, body },
-        data: {
-          type,
-          ...data,
-        },
-      };
-
-      const response = await getMessaging().sendEachForMulticast(message);
-      
-      // Clean up invalid tokens
-      if (response.failureCount > 0) {
-        const invalidTokens: string[] = [];
-        response.responses.forEach((resp, idx) => {
-          if (!resp.success) {
-            invalidTokens.push(user.fcmTokens[idx]);
-          }
+    // 1. Send to Expo Push Tokens (routes through APNs/FCM automatically)
+    if (expoTokens.length > 0) {
+      try {
+        const response = await fetch('https://exp.host/--/api/v2/push/send', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+          },
+          body: JSON.stringify(
+            expoTokens.map((t) => ({
+              to: t,
+              title,
+              body,
+              data: { type, ...data },
+              sound: 'default',
+              badge: 1,
+            })),
+          ),
         });
-        if (invalidTokens.length > 0) {
-          await this.userModel.findByIdAndUpdate(recipientId, {
-            $pullAll: { fcmTokens: invalidTokens },
+
+        const result = await response.json();
+        this.logger.log(`Expo push response for user ${recipientId}: ${JSON.stringify(result)}`);
+
+        // Clean up invalid Expo tokens (DeviceNotRegistered error)
+        if (result.data) {
+          const invalidExpoTokens: string[] = [];
+          result.data.forEach((ticket: any, idx: number) => {
+            if (ticket.status === 'error' && (ticket.details?.error === 'DeviceNotRegistered' || ticket.message?.includes('DeviceNotRegistered'))) {
+              invalidExpoTokens.push(expoTokens[idx]);
+            }
           });
+          if (invalidExpoTokens.length > 0) {
+            await this.userModel.findByIdAndUpdate(recipientId, {
+              $pullAll: { fcmTokens: invalidExpoTokens },
+            });
+          }
         }
+      } catch (expoErr) {
+        this.logger.error(`Error sending Expo push to user ${recipientId}`, expoErr);
       }
-    } catch (error) {
-      this.logger.error(`Error sending push to user ${recipientId}`, error);
+    }
+
+    // 2. Send to native FCM Tokens (only if firebaseApp is initialized)
+    if (fcmTokens.length > 0 && this.firebaseApp) {
+      try {
+        const message: MulticastMessage = {
+          tokens: fcmTokens,
+          notification: { title, body },
+          data: {
+            type,
+            ...data,
+          },
+        };
+
+        const response = await getMessaging().sendEachForMulticast(message);
+
+        // Clean up invalid FCM tokens
+        if (response.failureCount > 0) {
+          const invalidTokens: string[] = [];
+          response.responses.forEach((resp, idx) => {
+            if (!resp.success) {
+              invalidTokens.push(fcmTokens[idx]);
+            }
+          });
+          if (invalidTokens.length > 0) {
+            await this.userModel.findByIdAndUpdate(recipientId, {
+              $pullAll: { fcmTokens: invalidTokens },
+            });
+          }
+        }
+      } catch (fcmErr) {
+        this.logger.error(`Error sending Firebase push to user ${recipientId}`, fcmErr);
+      }
     }
   }
 
