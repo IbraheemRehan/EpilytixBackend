@@ -43,11 +43,35 @@ export class UsersService {
   }
 
   async getMyLogins(userId: string) {
-    const result = await this.auditLogService.getLogs({
-      userId,
-      action: { $in: ['LOGIN_SUCCESS', 'LOGIN_FAILED', 'LOGIN_2FA_SUCCESS'] },
-    }, { limit: 20 });
-    return { logins: result.items };
+    const allUsers = await this.userModel.find({ isActive: true })
+      .select('email firstName lastName role lastLoginAt createdAt')
+      .exec();
+
+    const logins = [];
+
+    for (const user of allUsers) {
+      const lastLog = await this.auditLogService.getLogs({
+        userId: user._id,
+        action: { $in: ['LOGIN_SUCCESS', 'LOGIN_2FA_SUCCESS'] },
+      }, { limit: 1 });
+
+      if (lastLog.items && lastLog.items.length > 0) {
+        logins.push(lastLog.items[0]);
+      } else {
+        logins.push({
+          userId: user,
+          action: 'LOGIN_SUCCESS',
+          resource: 'users',
+          ipAddress: 'Unknown IP',
+          userAgent: 'Unknown device',
+          timestamp: user.lastLoginAt || user.createdAt || new Date(),
+        });
+      }
+    }
+
+    logins.sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+    return { logins };
   }
 
   async updateMyProfile(userId: string, updateMeDto: UpdateMeDto) {
